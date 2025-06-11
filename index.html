@@ -107,6 +107,10 @@
       margin-top: 2px;
       line-height: 1.4;
     }
+    .route-line {
+      stroke-width: 3;
+      stroke-opacity: 0.7;
+    }
   </style>
 </head>
 <body>
@@ -114,16 +118,23 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 // =====================================================================
-// 1. Inisialisasi Peta dan Konfigurasi Dasar
+// 1. Konfigurasi OpenRouteService (Ganti dengan API Key Anda)
 // =====================================================================
-const map = L.map('map').setView([-6.5, 107.0], 7); // Set view ke Jawa Barat
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  maxZoom: 18,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+const OPENROUTE_API_KEY = '5b3ce3597851110001cf6248483d4bc51f4445e7bc3bc01e093a5c94'; // Dapatkan di openrouteservice.org
+
+// =====================================================================
+// 2. Inisialisasi Peta
+// =====================================================================
+const map = L.map('map').setView([-6.5, 107.0], 7);
+
+// Tambahkan tile layer OpenStreetMap
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 
 // =====================================================================
-// 2. Data Bus dan Rute
+// 3. Data Bus dan Rute
 // =====================================================================
 const BUS_OPERATORS = [
   "PO Rosalia Indah", "PO Sinar Jaya", "PO Lorena", "PO Haryanto",
@@ -138,40 +149,41 @@ const ROUTE_CODES = [
 
 // Koordinat penting
 const LOCATIONS = {
-  jakarta: L.latLng(-6.2618747, 106.8644323),
-  bandung: L.latLng(-6.946114, 107.593909),
-  semarang: L.latLng(-6.967718, 110.429848)
+  jakarta: L.latLng(-6.2618747, 106.8644323), // Monas
+  bandung: L.latLng(-6.946114, 107.593909),   // Gedung Sate
+  semarang: L.latLng(-6.967718, 110.429848),  // Lawang Sewu
+  cirebon: L.latLng(-6.7320, 108.5523),      // Cirebon
+  pekalongan: L.latLng(-6.8883, 109.6753)    // Pekalongan
 };
 
 const ROUTES_DATA = [
   {
     from: LOCATIONS.jakarta,
     to: LOCATIONS.bandung,
-    color: '#4285F4', // Biru Google
+    via: [LOCATIONS.cirebon],
+    color: '#4285F4',
     routeName: "Jakarta - Bandung"
   },
   {
     from: LOCATIONS.bandung,
     to: LOCATIONS.jakarta,
-    color: '#EA4335', // Merah Google
+    via: [LOCATIONS.cirebon],
+    color: '#EA4335',
     routeName: "Bandung - Jakarta"
   },
   {
     from: LOCATIONS.semarang,
     to: LOCATIONS.jakarta,
-    color: '#34A853', // Hijau Google
+    via: [LOCATIONS.pekalongan],
+    color: '#34A853',
     routeName: "Semarang - Jakarta"
   }
 ];
 
 // =====================================================================
-// 3. Fungsi Utilitas
+// 4. Fungsi Utilitas
 // =====================================================================
 
-/**
- * Menggenerate plat nomor kendaraan acak.
- * Format: [Huruf] [1234] [Huruf Huruf Huruf]
- */
 function generateLicensePlate() {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const numbers = '0123456789';
@@ -188,12 +200,9 @@ function generateLicensePlate() {
   return plate;
 }
 
-/**
- * Mengkonversi durasi menit ke format jam:menit dan menghitung estimasi waktu tiba.
- */
 function formatETA(minutes) {
   const now = new Date();
-  const arrivalTime = new Date(now.getTime() + minutes * 60000); // menit ke milidetik
+  const arrivalTime = new Date(now.getTime() + minutes * 60000);
   
   const hours = Math.floor(minutes / 60);
   const mins = Math.round(minutes % 60);
@@ -210,9 +219,6 @@ function formatETA(minutes) {
   return `${formattedTime}<div class="eta-time">Tiba ≈ ${arrivalHours}:${arrivalMins}</div>`;
 }
 
-/**
- * Interpolasi posisi antara dua titik geografis.
- */
 function interpolatePosition(from, to, progress) {
   return [
     from[0] + (to[0] - from[0]) * progress,
@@ -221,7 +227,7 @@ function interpolatePosition(from, to, progress) {
 }
 
 // =====================================================================
-// 4. Kelas Bus (untuk mengelola setiap bus secara terpisah)
+// 5. Kelas Bus dengan Rute Realistik
 // =====================================================================
 
 class Bus {
@@ -231,11 +237,12 @@ class Bus {
     this.busOperator = BUS_OPERATORS[Math.floor(Math.random() * BUS_OPERATORS.length)];
     this.routeCode = ROUTE_CODES[Math.floor(Math.random() * ROUTE_CODES.length)]; 
     this.licensePlate = generateLicensePlate();
-    this.baseSpeed = 60 + Math.random() * 20; // Kecepatan dasar acak (km/jam)
+    this.baseSpeed = 60 + Math.random() * 20;
     this.currentSpeed = this.baseSpeed;
-    this.occupancy = Math.floor(Math.random() * 40 + 50); // Persentase penumpang
+    this.occupancy = Math.floor(Math.random() * 40 + 50);
 
     this.marker = null;
+    this.routeLine = null;
     this.path = [];
     this.instructions = [];
     this.currentIndex = 0;
@@ -245,59 +252,110 @@ class Bus {
     this.initBus();
   }
 
-  initBus() {
-    // Buat path sederhana (garis lurus) dengan beberapa titik
-    this.generateSimplePath();
-    
-    // Buat instruksi sederhana
-    this.instructions = [
-      { index: 0, text: "Berangkat dari " + this.routeData.routeName.split(" - ")[0] },
-      { index: Math.floor(this.path.length/3), text: "Dalam perjalanan - Melewati tol" },
-      { index: Math.floor(2*this.path.length/3), text: "Dalam perjalanan - Mendekati tujuan" },
-      { index: this.path.length-1, text: "Tiba di " + this.routeData.routeName.split(" - ")[1] }
-    ];
+  async initBus() {
+    try {
+      // 1. Buat marker bus
+      this.marker = L.circleMarker(this.routeData.from, { 
+        radius: 9, 
+        color: this.routeData.color,
+        fillColor: this.routeData.color,
+        fillOpacity: 0.9,
+        weight: 2
+      }).addTo(this.map);
 
-    // Buat marker bus
-    this.marker = L.circleMarker(this.routeData.from, { 
-      radius: 9, 
-      color: this.routeData.color,
-      fillColor: this.routeData.color,
-      fillOpacity: 0.9,
-      weight: 2
-    }).addTo(this.map);
+      this.marker.on('click', () => {
+        this.updatePopupContent();
+        this.marker.openPopup();
+      });
 
-    this.marker.on('click', () => {
-      this.updatePopupContent();
-      this.marker.openPopup();
-    });
+      // 2. Dapatkan rute dari OpenRouteService
+      await this.fetchRoute();
 
-    // Mulai simulasi
-    this.startSimulation();
+      // 3. Gambar garis rute di peta
+      this.drawRouteLine();
+
+      // 4. Mulai simulasi
+      this.startSimulation();
+    } catch (error) {
+      console.error("Error initializing bus:", error);
+      // Jika gagal, gunakan path sederhana
+      this.generateSimplePath();
+      this.startSimulation();
+    }
   }
 
-  generateSimplePath(points = 100) {
+  async fetchRoute() {
+    const waypoints = [this.routeData.from, ...(this.routeData.via || []), this.routeData.to];
+    const coords = waypoints.map(wp => `${wp.lng},${wp.lat}`).join('|');
+    
+    const response = await fetch(
+      `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${OPENROUTE_API_KEY}` +
+      `&start=${coords.split('|')[0]}&end=${coords.split('|')[coords.split('|').length-1]}` +
+      `&intermediate_points=${coords.split('|').slice(1,-1).join('|')}`,
+      {
+        headers: {
+          'Accept': 'application/json, application/geo+json'
+        }
+      }
+    );
+    
+    const data = await response.json();
+    
+    if (!data.features || data.features.length === 0) {
+      throw new Error("Rute tidak ditemukan");
+    }
+
+    this.path = data.features[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+    
+    // Simpan instruksi dari OpenRouteService
+    this.instructions = data.features[0].properties.segments.flatMap(segment => 
+      segment.steps.map(step => ({
+        index: Math.floor(step.way_points[0] / 10), // Sesuaikan dengan path
+        text: step.instruction
+          .replace("left", "Belok kiri")
+          .replace("right", "Belok kanan")
+          .replace("arrive at", "Tiba di")
+          .replace("Head", "Jalan")
+      }))
+    );
+  }
+
+  generateSimplePath() {
     const from = this.routeData.from;
     const to = this.routeData.to;
+    const steps = 100;
     
-    for (let i = 0; i <= points; i++) {
-      const progress = i / points;
+    this.path = [];
+    for (let i = 0; i <= steps; i++) {
+      const progress = i / steps;
       this.path.push([
         from.lat + (to.lat - from.lat) * progress,
         from.lng + (to.lng - from.lng) * progress
       ]);
     }
+    
+    this.instructions = [
+      { index: 0, text: "Berangkat dari " + this.routeData.routeName.split(" - ")[0] },
+      { index: steps, text: "Tiba di " + this.routeData.routeName.split(" - ")[1] }
+    ];
   }
 
-  /**
-   * Memulai simulasi pergerakan bus.
-   */
+  drawRouteLine() {
+    if (this.routeLine) {
+      this.map.removeLayer(this.routeLine);
+    }
+
+    this.routeLine = L.polyline(this.path, {
+      color: this.routeData.color,
+      weight: 3,
+      opacity: 0.7
+    }).addTo(this.map);
+  }
+
   startSimulation() {
     this.animateBus();
   }
 
-  /**
-   * Mengupdate konten popup bus.
-   */
   updatePopupContent() {
     if (!this.marker) return;
 
@@ -308,18 +366,14 @@ class Bus {
                       now.getSeconds().toString().padStart(2, '0');
     
     const progressPercentage = Math.min(99, Math.floor((this.currentIndex / this.path.length) * 100));
-    // Estimasi jarak sisa (asumsi jarak antar titik path ~0.05 km)
     const remainingDistance = (this.path.length - this.currentIndex) * 0.05; 
     const etaMinutes = (remainingDistance / this.currentSpeed) * 60;
     
-    // Perubahan okupansi acak
     const occupancyChange = Math.floor(Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1);
     this.occupancy = Math.min(100, Math.max(0, this.occupancy + occupancyChange));
     
-    // Kecepatan sedikit bervariasi
     this.currentSpeed = this.baseSpeed * (0.95 + Math.random() * 0.1); 
     
-    // Filter instruksi untuk rute mendatang
     const upcomingInstructions = this.instructions.filter(inst => 
       inst.index > this.currentIndex && inst.index < this.currentIndex + 50
     ).slice(0, 3); 
@@ -375,15 +429,11 @@ class Bus {
     }
   }
 
-  /**
-   * Menggerakkan bus sepanjang rute.
-   */
   animateBus() {
     if (this.isPaused || this.currentIndex >= this.path.length - 1) {
       if (this.currentIndex >= this.path.length - 1) {
-        // Bus telah mencapai tujuan akhir, hapus dari peta
         this.map.removeLayer(this.marker);
-        // Batalkan animasi jika ada
+        this.map.removeLayer(this.routeLine);
         if (this.animationFrameId) {
           cancelAnimationFrame(this.animationFrameId);
         }
@@ -393,22 +443,21 @@ class Bus {
     
     const from = this.path[this.currentIndex];
     const to = this.path[this.currentIndex + 1];
-    const distance = this.map.distance(from, to); // Jarak dalam meter
-    const duration = (distance / (this.currentSpeed * 1000 / 3600)) * 1000; // Durasi dalam milidetik
+    const distance = this.map.distance(from, to);
+    const duration = (distance / (this.currentSpeed * 1000 / 3600)) * 1000;
 
-    const frames = Math.max(5, Math.min(30, Math.floor(duration / 50))); // Jumlah frame animasi
+    const frames = Math.max(5, Math.min(30, Math.floor(duration / 50)));
     let frame = 0;
     
     const step = () => {
       if (this.isPaused || frame >= frames) {
         this.currentIndex++;
-        // Simulasi berhenti di tengah rute
         if (this.currentIndex === Math.floor(this.path.length / 3) || this.currentIndex === Math.floor(2 * this.path.length / 3)) {
           this.isPaused = true;
           setTimeout(() => { 
             this.isPaused = false; 
             this.animationFrameId = requestAnimationFrame(this.animateBus.bind(this)); 
-          }, 5000); // Berhenti selama 5 detik
+          }, 5000);
         } else {
           this.animationFrameId = requestAnimationFrame(this.animateBus.bind(this));
         }
@@ -419,7 +468,6 @@ class Bus {
       const newPos = interpolatePosition(from, to, progress);
       this.marker.setLatLng(newPos);
       
-      // Update popup setiap beberapa frame untuk efisiensi
       if (frame % 5 === 0) { 
         this.updatePopupContent();
       }
@@ -433,9 +481,11 @@ class Bus {
 }
 
 // =====================================================================
-// 5. Inisialisasi Bus dan Mulai Simulasi
+// 6. Inisialisasi Bus dan Mulai Simulasi
 // =====================================================================
-ROUTES_DATA.forEach(route => new Bus(map, route));
+map.whenReady(() => {
+  ROUTES_DATA.forEach(route => new Bus(map, route));
+});
 </script>
 </body>
 </html>
