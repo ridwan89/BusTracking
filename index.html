@@ -14,12 +14,12 @@
       border-radius: 12px;
       padding: 16px;
       box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-      min-width: 280px; /* Lebar minimum */
-      max-width: 320px; /* Lebar maksimum */
+      min-width: 280px;
+      max-width: 320px;
     }
     .leaflet-popup-content {
       margin: 0;
-      width: auto !important; /* Membuat lebar menyesuaikan konten */
+      width: auto !important;
     }
     .bus-title {
       font-weight: 500;
@@ -49,7 +49,7 @@
       border-radius: 6px;
       margin: 12px 0;
       height: 10px;
-      position: relative; /* Penting untuk posisi icon bus */
+      position: relative;
     }
     .progress-bar {
       height: 100%;
@@ -57,27 +57,24 @@
       background-color: #4CAF50;
       transition: width 0.3s ease;
     }
-    /* Style untuk icon bus */
     .bus-icon {
-      width: 24px; /* Ukuran lingkaran luar - diperbesar */
-      height: 24px; /* Ukuran lingkaran luar - diperbesar */
-      background-color: #4CAF50; /* Warna yang sama dengan progress bar */
-      border-radius: 50%; /* Membuat bentuk lingkaran */
+      width: 24px;
+      height: 24px;
+      background-color: #4CAF50;
+      border-radius: 50%;
       position: absolute;
-      top: -7px; /* Sesuaikan agar di tengah vertikal dengan progress bar */
-      transform: translateX(-50%); /* Memastikan tengah icon tepat di posisi % */
-      border: 1px solid #fff; /* Border putih untuk visibilitas */
+      top: -7px;
+      transform: translateX(-50%);
+      border: 1px solid #fff;
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-      /* Menyelaraskan SVG di tengah lingkaran */
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: hidden; /* Pastikan SVG tidak keluar dari lingkaran */
+      overflow: hidden;
     }
     .bus-icon svg {
-      width: 60%; /* Ukuran SVG di dalam lingkaran */
+      width: 60%;
       height: 60%;
-      /* fill: #FFFFFF; (Warna isi SVG akan diatur langsung di dalam HTML) */
     }
     .highlight {
       font-weight: 500;
@@ -115,34 +112,28 @@
 <body>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.min.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
 <script>
-// =====================================================================
 // 1. Inisialisasi Peta dan Konfigurasi Dasar
-// =====================================================================
-const map = L.map('map').setView([-6.5, 107.0], 7); // Set view ke Jawa Barat
+const map = L.map('map').setView([-6.5, 107.0], 7);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 18,
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
 }).addTo(map);
 
-// =====================================================================
 // 2. Data Bus dan Rute
-// =====================================================================
 const BUS_OPERATORS = [
   "PO Rosalia Indah", "PO Sinar Jaya", "PO Lorena", "PO Haryanto",
   "PO Eka", "PO Kramat Djati", "PO Gunung Harta", "PO Laju Prima",
   "PO Santoso", "PO Putra Remaja"
 ];
 
-// ROUTE_CODES sekarang hanya berisi kode rute
 const ROUTE_CODES = [
   "G1032", "B2071", "S3054", "J4083", 
   "Y5012", "M6065", "D7078", "A8099"
 ];
 
-// Koordinat penting
 const LOCATIONS = {
   jakarta: L.latLng(-6.2618747, 106.8644323),
   bandung: L.latLng(-6.946114, 107.593909),
@@ -153,31 +144,24 @@ const ROUTES_DATA = [
   {
     from: LOCATIONS.jakarta,
     to: LOCATIONS.bandung,
-    color: '#4285F4', // Biru Google
+    color: '#4285F4',
     routeName: "Jakarta - Bandung"
   },
   {
     from: LOCATIONS.bandung,
     to: LOCATIONS.jakarta,
-    color: '#EA4335', // Merah Google
+    color: '#EA4335',
     routeName: "Bandung - Jakarta"
   },
   {
     from: LOCATIONS.semarang,
     to: LOCATIONS.jakarta,
-    color: '#34A853', // Hijau Google
+    color: '#34A853',
     routeName: "Semarang - Jakarta"
   }
 ];
 
-// =====================================================================
-// 3. Fungsi Utilitas
-// =====================================================================
-
-/**
- * Menggenerate plat nomor kendaraan acak.
- * Format: [Huruf] [1234] [Huruf Huruf Huruf]
- */
+// Fungsi Utilitas
 function generateLicensePlate() {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const numbers = '0123456789';
@@ -194,12 +178,9 @@ function generateLicensePlate() {
   return plate;
 }
 
-/**
- * Mengkonversi durasi menit ke format jam:menit dan menghitung estimasi waktu tiba.
- */
 function formatETA(minutes) {
   const now = new Date();
-  const arrivalTime = new Date(now.getTime() + minutes * 60000); // menit ke milidetik
+  const arrivalTime = new Date(now.getTime() + minutes * 60000);
   
   const hours = Math.floor(minutes / 60);
   const mins = Math.round(minutes % 60);
@@ -216,9 +197,6 @@ function formatETA(minutes) {
   return `${formattedTime}<div class="eta-time">Tiba ≈ ${arrivalHours}:${arrivalMins}</div>`;
 }
 
-/**
- * Interpolasi posisi antara dua titik geografis.
- */
 function interpolatePosition(from, to, progress) {
   return [
     from[0] + (to[0] - from[0]) * progress,
@@ -226,21 +204,17 @@ function interpolatePosition(from, to, progress) {
   ];
 }
 
-// =====================================================================
-// 4. Kelas Bus (untuk mengelola setiap bus secara terpisah)
-// =====================================================================
-
+// Kelas Bus
 class Bus {
   constructor(map, routeData) {
     this.map = map;
     this.routeData = routeData;
     this.busOperator = BUS_OPERATORS[Math.floor(Math.random() * BUS_OPERATORS.length)];
-    // Mengambil kode rute langsung dari array ROUTE_CODES
     this.routeCode = ROUTE_CODES[Math.floor(Math.random() * ROUTE_CODES.length)]; 
     this.licensePlate = generateLicensePlate();
-    this.baseSpeed = 60 + Math.random() * 20; // Kecepatan dasar acak (km/jam)
+    this.baseSpeed = 60 + Math.random() * 20;
     this.currentSpeed = this.baseSpeed;
-    this.occupancy = Math.floor(Math.random() * 40 + 50); // Persentase penumpang
+    this.occupancy = Math.floor(Math.random() * 40 + 50);
 
     this.marker = null;
     this.routingControl = null;
@@ -248,32 +222,9 @@ class Bus {
     this.instructions = [];
     this.currentIndex = 0;
     this.isPaused = false;
-    this.animationFrameId = null; // Untuk mengontrol requestAnimationFrame
+    this.animationFrameId = null;
 
-    this.initBus();
-  }
-
-  initBus() {
-    this.routingControl = L.Routing.control({
-      waypoints: [this.routeData.from, this.routeData.to],
-      lineOptions: {
-        styles: [{ 
-          color: this.routeData.color, 
-          weight: 2,
-          opacity: 0.8
-        }]
-      },
-      createMarker: () => null, // Tidak membuat marker default
-      addWaypoints: false,
-      routeWhileDragging: false,
-      fitSelectedRoutes: false,
-      show: false // Jangan tampilkan kontrol rute
-    }).on('routesfound', (e) => {
-      this.path = e.routes[0].coordinates.map(c => [c.lat, c.lng]);
-      this.instructions = e.routes[0].instructions;
-      this.startSimulation();
-    }).addTo(this.map);
-
+    // Buat marker terlebih dahulu
     this.marker = L.circleMarker(this.routeData.from, { 
       radius: 9, 
       color: this.routeData.color,
@@ -286,18 +237,42 @@ class Bus {
       this.updatePopupContent();
       this.marker.openPopup();
     });
+
+    // Inisialisasi routing control
+    this.initRouting();
   }
 
-  /**
-   * Memulai simulasi pergerakan bus.
-   */
+  initRouting() {
+    this.routingControl = L.Routing.control({
+      waypoints: [this.routeData.from, this.routeData.to],
+      lineOptions: {
+        styles: [{ 
+          color: this.routeData.color, 
+          weight: 2,
+          opacity: 0.8
+        }]
+      },
+      createMarker: () => null,
+      addWaypoints: false,
+      routeWhileDragging: false,
+      fitSelectedRoutes: false,
+      show: false
+    }).addTo(this.map);
+
+    this.routingControl.on('routesfound', (e) => {
+      this.path = e.routes[0].coordinates.map(c => [c.lat, c.lng]);
+      this.instructions = e.routes[0].instructions;
+      this.startSimulation();
+    });
+
+    // Memastikan routing plan dibuat
+    this.routingControl.route();
+  }
+
   startSimulation() {
     this.animateBus();
   }
 
-  /**
-   * Mengupdate konten popup bus.
-   */
   updatePopupContent() {
     if (!this.marker) return;
 
@@ -308,18 +283,14 @@ class Bus {
                       now.getSeconds().toString().padStart(2, '0');
     
     const progressPercentage = Math.min(99, Math.floor((this.currentIndex / this.path.length) * 100));
-    // Estimasi jarak sisa (asumsi jarak antar titik path ~0.05 km)
     const remainingDistance = (this.path.length - this.currentIndex) * 0.05; 
     const etaMinutes = (remainingDistance / this.currentSpeed) * 60;
     
-    // Perubahan okupansi acak
     const occupancyChange = Math.floor(Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1);
     this.occupancy = Math.min(100, Math.max(0, this.occupancy + occupancyChange));
     
-    // Kecepatan sedikit bervariasi
     this.currentSpeed = this.baseSpeed * (0.95 + Math.random() * 0.1); 
     
-    // Filter instruksi untuk rute mendatang
     const upcomingInstructions = this.instructions.filter(inst => 
       inst.index > this.currentIndex && inst.index < this.currentIndex + 50
     ).slice(0, 3); 
@@ -378,16 +349,11 @@ class Bus {
     }
   }
 
-  /**
-   * Menggerakkan bus sepanjang rute.
-   */
   animateBus() {
     if (this.isPaused || this.currentIndex >= this.path.length - 1) {
       if (this.currentIndex >= this.path.length - 1) {
-        // Bus telah mencapai tujuan akhir, hapus dari peta
         this.map.removeLayer(this.marker);
         this.map.removeControl(this.routingControl);
-        // Batalkan animasi jika ada
         if (this.animationFrameId) {
           cancelAnimationFrame(this.animationFrameId);
         }
@@ -397,22 +363,21 @@ class Bus {
     
     const from = this.path[this.currentIndex];
     const to = this.path[this.currentIndex + 1];
-    const distance = this.map.distance(from, to); // Jarak dalam meter
-    const duration = (distance / (this.currentSpeed * 1000 / 3600)) * 1000; // Durasi dalam milidetik
+    const distance = this.map.distance(from, to);
+    const duration = (distance / (this.currentSpeed * 1000 / 3600)) * 1000;
 
-    const frames = Math.max(5, Math.min(30, Math.floor(duration / 50))); // Jumlah frame animasi
+    const frames = Math.max(5, Math.min(30, Math.floor(duration / 50)));
     let frame = 0;
     
     const step = () => {
       if (this.isPaused || frame >= frames) {
         this.currentIndex++;
-        // Simulasi berhenti di tengah rute
         if (this.currentIndex === Math.floor(this.path.length / 3) || this.currentIndex === Math.floor(2 * this.path.length / 3)) {
           this.isPaused = true;
           setTimeout(() => { 
             this.isPaused = false; 
             this.animationFrameId = requestAnimationFrame(this.animateBus.bind(this)); 
-          }, 5000); // Berhenti selama 5 detik
+          }, 5000);
         } else {
           this.animationFrameId = requestAnimationFrame(this.animateBus.bind(this));
         }
@@ -423,7 +388,6 @@ class Bus {
       const newPos = interpolatePosition(from, to, progress);
       this.marker.setLatLng(newPos);
       
-      // Update popup setiap beberapa frame untuk efisiensi
       if (frame % 5 === 0) { 
         this.updatePopupContent();
       }
@@ -436,10 +400,10 @@ class Bus {
   }
 }
 
-// =====================================================================
-// 5. Inisialisasi Bus dan Mulai Simulasi
-// =====================================================================
-ROUTES_DATA.forEach(route => new Bus(map, route));
+// Mulai simulasi setelah peta siap
+map.whenReady(() => {
+  ROUTES_DATA.forEach(route => new Bus(map, route));
+});
 </script>
 </body>
 </html>
